@@ -91,6 +91,13 @@ h2{font-size:18px;margin:4px 0 10px}
 .addCat{display:flex;gap:6px;margin-top:6px}
 .addCat input:first-child{width:64px;text-align:center}
 .fab{position:sticky;bottom:4px;margin-top:auto}
+.pch{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.pch button{background:var(--card2);border-radius:20px;padding:7px 12px;font-size:13px;color:var(--mut)}
+.pch button.on{background:var(--acc);color:#04263a;font-weight:700}
+.two{display:flex;gap:6px;margin-bottom:8px}.two div{flex:1}.two small{color:var(--mut);font-size:12px}
+.clk{cursor:pointer}
+.nchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.nchips .chip{max-width:none;background:var(--card2);color:var(--txt)}
 .tag{font-size:11px;background:var(--card2);border-radius:8px;padding:2px 7px;color:var(--mut)}
 </style>
 </head>
@@ -125,9 +132,13 @@ h2{font-size:18px;margin:4px 0 10px}
 
 <!-- ============ التقارير ============ -->
 <section id="rep" class="view">
+  <div class="seg" style="margin-bottom:10px"><button id="rmM" class="on" onclick="setRMode('m')">📅 شهري</button><button id="rmD" onclick="setRMode('d')">🔎 تقرير مفصّل</button></div>
+  <div id="repM">
   <div class="mnav"><button onclick="mv(-1)">›</button><b class="mLbl"></b><button onclick="mv(1)">‹</button></div>
   <div class="sum3" id="rSum"></div>
   <div id="rBody"></div>
+  </div>
+  <div id="repD" style="display:none"></div>
 </section>
 
 <!-- ============ الديون ============ -->
@@ -145,7 +156,7 @@ h2{font-size:18px;margin:4px 0 10px}
     <div id="bkInfo" style="color:var(--mut);font-size:13px;line-height:1.7"></div>
     <button class="btn" onclick="exportJSON()">📤 حفظ نسخة احتياطية</button>
     <button class="btn sec" onclick="document.getElementById('impFile').click()">📥 استرجاع نسخة</button>
-    <button class="btn sec" onclick="exportCSV()">📊 تصدير ملف Excel (CSV)</button>
+    <button class="btn sec" onclick="exportCSV(null)">📊 تصدير ملف Excel (CSV)</button>
     <input type="file" id="impFile" accept=".json,application/json" style="display:none" onchange="importJSON(this)">
   </div>
   <h2>🏷 تصنيفات المصروف</h2>
@@ -154,7 +165,7 @@ h2{font-size:18px;margin:4px 0 10px}
   <div class="card" id="catsIn"></div>
   <h2>⚠️ منطقة خطر</h2>
   <div class="card"><button class="btn red" id="wipeBtn" onclick="wipe(this)">مسح كل البيانات</button></div>
-  <p style="color:var(--mut);font-size:12px;text-align:center;margin:10px 0 20px">فلوسي • بيشتغل من غير نت • بياناتك على موبايلك بس</p>
+  <p style="color:var(--mut);font-size:12px;text-align:center;margin:10px 0 20px">فلوسي • إصدار 2 • بيشتغل من غير نت • بياناتك على موبايلك بس</p>
 </section>
 
 <nav>
@@ -226,7 +237,10 @@ function pickDate(){const i=$('dateInp');i.value=toDateInput(dateTs||Date.now())
 function dateChanged(){const v=$('dateInp').value;if(!v)return;const ts=fromDateInput(v);dateTs=dKey(ts)===dKey(Date.now())?null:ts;drawMeta()}
 function editNote(){openSheet(`<h2>📝 ملاحظة</h2><input id="nInp" maxlength="60" placeholder="مثلاً: غدا مع الشباب" value="${esc(note)}">
  <button class="btn" onclick="note=$('nInp').value.trim();drawMeta();closeSheet()">تمام</button>
- ${note?`<button class="btn sec" onclick="note='';drawMeta();closeSheet()">امسح الملاحظة</button>`:''}`);setTimeout(()=>$('nInp').focus(),250)}
+ ${note?`<button class="btn sec" onclick="note='';drawMeta();closeSheet()">امسح الملاحظة</button>`:''}
+ ${recentNotes().length?`<label>آخر حاجات كتبتها (دوس عليها على طول)</label><div class="nchips">${recentNotes().map(n=>`<button class="chip" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>`:''}`);
+ $('sheet').querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{note=b.dataset.n;drawMeta();closeSheet()})}
+function recentNotes(){const seen=new Set(),out=[];for(let i=S.tx.length-1;i>=0&&out.length<15;i--){const t=S.tx[i];if(t.type!==type||t.cat==='debt'||!t.note)continue;const k=t.note.trim();if(!seen.has(k)){seen.add(k);out.push(k)}}return out}
 
 function balance(){return S.tx.reduce((s,t)=>s+(t.type==='in'?t.amt:-t.amt),0)}
 function monthTot(mk){let i=0,o=0;for(const t of S.tx)if(mKey(t.ts)===mk&&t.cat!=='debt')t.type==='in'?i+=t.amt:o+=t.amt;return{i,o}}
@@ -243,7 +257,7 @@ function go(v){view=v;document.querySelectorAll('nav button').forEach(b=>b.class
 function mv(d){let y=Math.floor(curM/100),m=curM%100+d;if(m<0){m=11;y--}if(m>11){m=0;y++}curM=y*100+m;renderAll()}
 function mLabel(mk){return MONTHS[mk%100]+' '+Math.floor(mk/100)}
 function renderAll(){renderHead();document.querySelectorAll('.mLbl').forEach(e=>e.textContent=mLabel(curM));
- if(view==='log')renderLog();if(view==='rep')renderRep();if(view==='debt')renderDebts();if(view==='set')renderSet()}
+ if(view==='log')renderLog();if(view==='rep')(rMode==='m'?renderRep():renderDet());if(view==='debt')renderDebts();if(view==='set')renderSet()}
 function sum3(mk){const m=monthTot(mk),n=m.i-m.o;return `<div><small>الدخل</small><b class="n">${fmt(m.i)}</b></div><div><small>المصروف</small><b class="o">${fmt(m.o)}</b></div><div><small>الفرق</small><b class="${n<0?'o':'n'}">${fmt(n)}</b></div>`}
 
 /* ========== السجل ========== */
@@ -286,13 +300,13 @@ function renderRep(){$('rSum').innerHTML=sum3(curM);
  if(out.length){const tot=out.reduce((s,x)=>s+x[1],0);
   h+=`<div class="card"><b>فلوسك راحت فين؟</b>${donut(out.map(x=>x[1]),tot)}`;
   out.forEach(([c,v],i)=>{const cc=catOf('out',c),p=v/tot*100;
-   h+=`<div class="lg"><span class="dot" style="background:${COLORS[i%COLORS.length]}"></span><span class="t">${cc[1]} ${esc(cc[2])}</span><b>${fmt(v)}</b><span class="tag">${p.toFixed(0)}%</span></div>`});
+   h+=`<div class="lg clk" onclick="openDet('out','${c}')"><span class="dot" style="background:${COLORS[i%COLORS.length]}"></span><span class="t">${cc[1]} ${esc(cc[2])}</span><b>${fmt(v)}</b><span class="tag">${p.toFixed(0)}%</span></div>`});
   const now=new Date(),isCur=curM===mKey(Date.now());
   const days=isCur?now.getDate():new Date(Math.floor(curM/100),curM%100+1,0).getDate();
-  h+=`<div style="color:var(--mut);font-size:13px;margin-top:8px">متوسط مصروفك في اليوم: <b style="color:var(--txt)">${fmt(tot/days)} ج</b></div></div>`}
+  h+=`<div style="color:var(--mut);font-size:13px;margin-top:8px">متوسط مصروفك في اليوم: <b style="color:var(--txt)">${fmt(tot/days)} ج</b></div><div style="color:var(--acc);font-size:12px;margin-top:6px">👆 دوس على أي تصنيف عشان تشوف تفاصيله</div></div>`}
  if(inc.length){const tot=inc.reduce((s,x)=>s+x[1],0);
   h+=`<div class="card"><b>دخلك جه منين؟</b>`;
-  inc.forEach(([c,v])=>{const cc=catOf('in',c);h+=`<div style="margin:10px 0"><div style="display:flex;justify-content:space-between"><span>${cc[1]} ${esc(cc[2])}</span><b>${fmt(v)}</b></div><div class="bar"><div style="width:${v/tot*100}%;background:var(--in)"></div></div></div>`});
+  inc.forEach(([c,v])=>{const cc=catOf('in',c);h+=`<div class="clk" onclick="openDet('in','${c}')" style="margin:10px 0"><div style="display:flex;justify-content:space-between"><span>${cc[1]} ${esc(cc[2])}</span><b>${fmt(v)}</b></div><div class="bar"><div style="width:${v/tot*100}%;background:var(--in)"></div></div></div>`});
   h+='</div>'}
  // مقارنة آخر 6 شهور
  const ms=[];let y=Math.floor(curM/100),m=curM%100;for(let k=0;k<6;k++){ms.unshift(y*100+m);m--;if(m<0){m=11;y--}}
@@ -301,6 +315,51 @@ function renderRep(){$('rSum').innerHTML=sum3(curM);
  ms.map((mk,i)=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end"><div style="display:flex;gap:2px;align-items:flex-end;height:100%;width:100%;justify-content:center"><div style="width:40%;background:var(--in);border-radius:3px 3px 0 0;height:${vals[i].i/mx*100}%"></div><div style="width:40%;background:var(--out);border-radius:3px 3px 0 0;height:${vals[i].o/mx*100}%"></div></div><small style="color:var(--mut);font-size:10px">${MONTHS[mk%100].slice(0,4)}</small></div>`).join('')+
  `</div><div style="display:flex;gap:14px;justify-content:center;font-size:12px;margin-top:6px;color:var(--mut)"><span><span class="n">■</span> دخل</span><span><span class="o">■</span> مصروف</span></div></div>`;
  $('rBody').innerHTML=h}
+/* ========== التقرير المفصّل ========== */
+let rMode='m';
+const R={p:'m0',type:'out',cat:'all',from:'',to:''};
+function setRMode(m){rMode=m;$('rmM').classList.toggle('on',m==='m');$('rmD').classList.toggle('on',m==='d');$('repM').style.display=m==='m'?'':'none';$('repD').style.display=m==='d'?'':'none';renderAll();$('rep').scrollTop=0}
+function openDet(tp,c){const y=Math.floor(curM/100),m=curM%100;R.type=tp;R.cat=c;R.p='c';R.from=toDateInput(new Date(y,m,1).getTime());R.to=toDateInput(new Date(y,m+1,0).getTime());setRMode('d')}
+function ymd(v){const [y,m,d]=v.split('-').map(Number);return new Date(y,m-1,d)}
+function rRange(){const n=new Date(),Y=n.getFullYear(),M=n.getMonth();
+ switch(R.p){case 'm0':return[new Date(Y,M,1),new Date(Y,M+1,1)];
+  case 'm1':return[new Date(Y,M-1,1),new Date(Y,M,1)];
+  case 'm3':return[new Date(Y,M-2,1),new Date(Y,M+1,1)];
+  case 'y':return[new Date(Y,0,1),new Date(Y+1,0,1)];
+  default:{if(!R.from)R.from=toDateInput(new Date(Y,M,1).getTime());if(!R.to)R.to=toDateInput(Date.now());
+   let f=ymd(R.from),t=ymd(R.to);if(t<f)[f,t]=[t,f];return[f,new Date(t.getFullYear(),t.getMonth(),t.getDate()+1)]}}}
+function setP(p){R.p=p;if(p==='c'){const[f,t]=rRange();}renderDet()}
+function renderDet(){
+ const [f,t]=rRange(),F=f.getTime(),T=t.getTime();
+ const list=S.tx.filter(x=>x.type===R.type&&x.cat!=='debt'&&x.ts>=F&&x.ts<T&&(R.cat==='all'||x.cat===R.cat)).sort((a,b)=>b.ts-a.ts);
+ const tot=list.reduce((s,x)=>s+x.amt,0);
+ const end=Math.min(T,dKey(Date.now())+864e5),days=Math.max(1,Math.round((end-F)/864e5));
+ const P=[['m0','الشهر ده'],['m1','الشهر اللي فات'],['m3','آخر 3 شهور'],['y','السنة دي'],['c','📅 من تاريخ لتاريخ']];
+ const cats=S.cats[R.type];
+ if(R.cat!=='all'&&!cats.find(c=>c[0]===R.cat))R.cat='all';
+ const word=R.type==='out'?'صرفت':'دخلك';
+ let h=`<div class="card">
+  <div class="pch">${P.map(([k,l])=>`<button class="${R.p===k?'on':''}" onclick="setP('${k}')">${l}</button>`).join('')}</div>
+  ${R.p==='c'?`<div class="two"><div><small>من</small><input type="date" value="${R.from}" onchange="R.from=this.value;renderDet()"></div><div><small>إلى</small><input type="date" value="${R.to}" onchange="R.to=this.value;renderDet()"></div></div>`:''}
+  <div class="seg" style="margin-bottom:8px"><button class="${R.type==='out'?'on':''}" onclick="R.type='out';R.cat='all';renderDet()">مصروف</button><button class="${R.type==='in'?'on':''}" onclick="R.type='in';R.cat='all';renderDet()">دخل</button></div>
+  <select onchange="R.cat=this.value;renderDet()"><option value="all">📂 كل التصنيفات</option>${cats.map(c=>`<option value="${c[0]}" ${R.cat===c[0]?'selected':''}>${c[1]} ${esc(c[2])}</option>`).join('')}</select>
+  <div style="color:var(--mut);font-size:12px;margin-top:8px;text-align:center">من ${dayLabel(F)} لحد ${dayLabel(T-1)}</div>
+ </div>`;
+ h+=`<div class="sum3"><div><small>الإجمالي</small><b class="${R.type==='out'?'o':'n'}">${fmt(tot)}</b></div><div><small>عدد المرات</small><b>${list.length}</b></div><div><small>متوسط اليوم</small><b>${fmt(tot/days)}</b></div></div>`;
+ if(!list.length){$('repD').innerHTML=h+'<div class="empty">مفيش حركات في المدة دي</div>';return}
+ const group=(keyFn)=>{const m={};list.forEach(x=>{const k=keyFn(x);(m[k]=m[k]||{v:0,n:0});m[k].v+=x.amt;m[k].n++});return Object.entries(m).sort((a,b)=>b[1].v-a[1].v)};
+ const bars=(rows,lbl,click)=>rows.map(([k,o],i)=>`<div ${click?`class="clk" onclick="${click(k)}"`:''} style="margin:10px 0"><div style="display:flex;justify-content:space-between;gap:8px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lbl(k)} <span class="tag">${o.n} مرة</span></span><b>${fmt(o.v)} <span class="tag">${(o.v/tot*100).toFixed(0)}%</span></b></div><div class="bar"><div style="width:${o.v/tot*100}%;background:${COLORS[i%COLORS.length]}"></div></div></div>`).join('');
+ if(R.cat==='all'){
+  h+=`<div class="card"><b>حسب التصنيف</b><div style="color:var(--acc);font-size:12px;margin-top:4px">👆 دوس على أي تصنيف عشان تشوف بنوده</div>${bars(group(x=>x.cat),k=>{const c=catOf(R.type,k);return c[1]+' '+esc(c[2])},k=>`R.cat='${k}';renderDet();$('rep').scrollTop=0`)}</div>`}
+ else{const c=catOf(R.type,R.cat),items=group(x=>(x.note||'').trim()||'—');
+  h+=`<div class="card"><b>${c[1]} ${esc(c[2])}: ${word} في إيه بالظبط؟</b>${bars(items,k=>k==='—'?'<span style="color:var(--mut)">من غير ملاحظة</span>':esc(k))}
+  ${items.some(([k])=>k==='—')?`<div style="color:var(--mut);font-size:12px;margin-top:8px;line-height:1.6">💡 الحركات اللي «من غير ملاحظة» مش هتعرف هي إيه. اكتب ملاحظة وانت بتسجّل (زي: عيش، خضار، كهربا) عشان التقرير يطلع بالبنود.</div>`:''}</div>`}
+ h+=`<div class="card"><b>كل الحركات (${list.length})</b>`;let lastD=null;
+ for(const x of list){const dk=dKey(x.ts);if(dk!==lastD){lastD=dk;h+=`<div class="day"><span>${dayLabel(x.ts)}</span></div>`}
+  const c=catOf(x.type,x.cat);h+=`<button class="row" style="background:var(--card2)" onclick="editTx('${x.id}')"><i>${c[1]}</i><div class="t"><div>${x.note?esc(x.note):esc(c[2])}</div>${x.note?`<small>${esc(c[2])}</small>`:''}</div><b class="${x.type==='in'?'n':'o'}">${fmt(x.amt)}</b></button>`}
+ h+='</div><button class="btn sec" id="detCsv">📊 تصدير التقرير ده Excel</button><div style="height:12px"></div>';
+ $('repD').innerHTML=h;
+ $('detCsv').onclick=()=>exportCSV(list,`flosy-report-${toDateInput(F)}_${toDateInput(T-1)}.csv`)}
 function donut(vals,tot){const r=60,C=2*Math.PI*r;let off=0,s='';
  vals.forEach((v,i)=>{const len=v/tot*C;s+=`<circle r="${r}" cx="80" cy="80" fill="none" stroke="${COLORS[i%COLORS.length]}" stroke-width="26" stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}" transform="rotate(-90 80 80)"/>`;off+=len});
  return `<svg viewBox="0 0 160 160" style="width:180px;display:block;margin:10px auto">${s}<text x="80" y="76" text-anchor="middle" fill="#94a3b8" font-size="11">إجمالي</text><text x="80" y="94" text-anchor="middle" fill="#f1f5f9" font-size="16" font-weight="700">${fmt(tot)}</text></svg>`}
@@ -361,10 +420,10 @@ async function shareOrDownload(blob,name){
  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);return true}
 async function exportJSON(){const ok=await shareOrDownload(new Blob([JSON.stringify(S)],{type:'application/json'}),`flosy-backup-${stamp()}.json`);
  if(ok){S.lastBackup=Date.now();save();renderAll();toast('✓ النسخة اتعملت')}}
-function exportCSV(){const rows=[['التاريخ','النوع','التصنيف','المبلغ','ملاحظة']];
- S.tx.slice().sort((a,b)=>a.ts-b.ts).forEach(t=>rows.push([toDateInput(t.ts),t.type==='in'?'دخل':'مصروف',catOf(t.type,t.cat)[2],t.amt,t.note||'']));
+function exportCSV(list,name){const rows=[['التاريخ','النوع','التصنيف','المبلغ','ملاحظة']];
+ (list||S.tx).slice().sort((a,b)=>a.ts-b.ts).forEach(t=>rows.push([toDateInput(t.ts),t.type==='in'?'دخل':'مصروف',catOf(t.type,t.cat)[2],t.amt,t.note||'']));
  const csv='﻿'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
- shareOrDownload(new Blob([csv],{type:'text/csv'}),`flosy-${stamp()}.csv`)}
+ shareOrDownload(new Blob([csv],{type:'text/csv'}),name||`flosy-${stamp()}.csv`)}
 function importJSON(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();
  r.onload=()=>{let d;try{d=JSON.parse(r.result)}catch(e){toast('الملف ده مش نسخة فلوسي');return}
   if(!d||!d.v||!Array.isArray(d.tx)||!d.cats){toast('الملف ده مش نسخة فلوسي');return}
